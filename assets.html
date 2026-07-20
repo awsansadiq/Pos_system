@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام المبيعات والمخزون الذكي | POS System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Cairo) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        /* مظهر مخصص لشريط التمرير */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-zinc-50 text-zinc-800 min-h-screen flex flex-col md:flex-row">
+
+    <!-- التنبيهات المنبثقة (Toast Notification) -->
+    <div id="toast" class="fixed top-5 left-5 z-50 transform -translate-x-full transition-transform duration-300 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg flex items-center space-x-3 space-x-reverse hidden">
+        <i class="fas fa-check-circle text-lg"></i>
+        <span id="toast-message" class="font-semibold">تمت العملية بنجاح!</span>
+    </div>
+
+    <!-- القائمة الجانبية (Sidebar) -->
+    <aside class="w-full md:w-64 bg-zinc-900 text-white flex flex-col border-l border-zinc-800 z-10">
+        <div class="p-5 border-b border-zinc-800 flex items-center space-x-3 space-x-reverse">
+            <div class="bg-emerald-500 p-2.5 rounded-xl text-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <i class="fas fa-cash-register"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">كاشير المدى</h1>
+                <span class="text-xs text-zinc-400">نظام إدارة ذكي</span>
+            </div>
+        </div>
+        
+        <!-- أزرار التنقل -->
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white">
+                <i class="fas fa-chart-pie w-5"></i>
+                <span>لوحة التحكم</span>
+            </button>
+            <button onclick="switchView('pos')" id="nav-pos" class="w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white">
+                <i class="fas fa-shopping-basket w-5"></i>
+                <span>شاشة البيع (POS)</span>
+            </button>
+            <button onclick="switchView('products')" id="nav-products" class="w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white">
+                <i class="fas fa-boxes-stacked w-5"></i>
+                <span>إدارة المخزون</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-zinc-800 text-center text-xs text-zinc-500">
+            معرض الأعمال &copy; 2026
+        </div>
+    </aside>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        
+        <!-- الهيدر العلوي -->
+        <header class="bg-white border-b border-zinc-200 h-16 min-h-16 flex items-center justify-between px-6">
+            <h2 id="view-title" class="text-xl font-bold text-zinc-800">لوحة التحكم</h2>
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <span id="live-clock" class="text-sm font-medium text-zinc-500 bg-zinc-100 px-3 py-1.5 rounded-lg"></span>
+                <div class="h-8 w-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow">
+                    A
+                </div>
+            </div>
+        </header>
+
+        <!-- منطقة العرض الديناميكية -->
+        <div class="flex-1 overflow-y-auto p-6">
+            
+            <!-- 1. واجهة لوحة التحكم (Dashboard View) -->
+            <section id="view-dashboard" class="space-y-6">
+                <!-- كروت الإحصائيات -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-zinc-400 mb-1">مبيعات اليوم</p>
+                            <h3 id="stat-sales" class="text-3xl font-bold text-zinc-800">0.00 ر.س</h3>
+                        </div>
+                        <div class="bg-emerald-50 text-emerald-600 p-4 rounded-xl text-2xl"><i class="fas fa-wallet"></i></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-zinc-400 mb-1">عدد العمليات</p>
+                            <h3 id="stat-transactions" class="text-3xl font-bold text-zinc-800">0</h3>
+                        </div>
+                        <div class="bg-blue-50 text-blue-600 p-4 rounded-xl text-2xl"><i class="fas fa-receipt"></i></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-zinc-400 mb-1">المنتجات في المخزن</p>
+                            <h3 id="stat-stock" class="text-3xl font-bold text-zinc-800">0</h3>
+                        </div>
+                        <div class="bg-amber-50 text-amber-600 p-4 rounded-xl text-2xl"><i class="fas fa-box"></i></div>
+                    </div>
+                </div>
+
+                <!-- جدول العمليات الأخيرة -->
+                <div class="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-zinc-100 flex justify-between items-center">
+                        <h4 class="font-bold text-zinc-800 text-lg">آخر العمليات المنفذة</h4>
+                        <span class="text-xs font-semibold bg-zinc-100 text-zinc-600 px-2.5 py-1 rounded-full">تحديث فوري</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-zinc-50 text-zinc-500 text-sm border-b border-zinc-100">
+                                    <th class="p-4 font-semibold">رقم الفاتورة</th>
+                                    <th class="p-4 font-semibold">التاريخ والوقت</th>
+                                    <th class="p-4 font-semibold">الضريبة (15%)</th>
+                                    <th class="p-4 font-semibold">الإجمالي النهائي</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-sales-table" class="divide-y divide-zinc-100 text-sm">
+                                <!-- تضاف الفواتير برمجياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. واجهة نقطة البيع (POS View) -->
+            <section id="view-pos" class="hidden h-full flex flex-col lg:flex-row gap-6 items-stretch">
+                <!-- شبكة المنتجات -->
+                <div class="flex-1 flex flex-col space-y-4">
+                    <div class="flex items-center justify-between bg-white p-4 rounded-xl border border-zinc-200">
+                        <span class="font-bold text-zinc-700">قائمة المنتجات المتوفرة</span>
+                        <span id="pos-product-count" class="text-xs bg-zinc-100 text-zinc-600 px-3 py-1 rounded-full font-medium"></span>
+                    </div>
+                    <div id="pos-products-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto max-h-[calc(100vh-240px)] p-1">
+                        <!-- المنتجات تضاف هنا -->
+                    </div>
+                </div>
+
+                <!-- سلة المشتريات الجانبية -->
+                <div class="w-full lg:w-96 bg-white border border-zinc-200 rounded-2xl shadow-sm flex flex-col max-h-[calc(100vh-180px)]">
+                    <div class="p-4 border-b border-zinc-100 flex justify-between items-center">
+                        <h4 class="font-bold text-zinc-800 flex items-center gap-2">
+                            <i class="fas fa-shopping-cart text-emerald-500"></i> سلة المشتريات
+                        </h4>
+                        <button onclick="clearCart()" class="text-xs text-rose-500 hover:underline font-semibold">حذف الكل</button>
+                    </div>
+
+                    <!-- عناصر السلة -->
+                    <div id="cart-items-container" class="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-zinc-50">
+                        <!-- مخرجات السلة -->
+                    </div>
+
+                    <!-- ملخص الحساب والإتمام -->
+                    <div class="p-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl space-y-3">
+                        <div class="flex justify-between text-sm text-zinc-500">
+                            <span>المجموع الفرعي</span>
+                            <span id="summary-subtotal">0.00 ر.س</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-zinc-500">
+                            <span>الضريبة (15%)</span>
+                            <span id="summary-tax">0.00 ر.س</span>
+                        </div>
+                        <div class="flex justify-between text-lg font-bold text-zinc-800 border-t border-dashed border-zinc-200 pt-2">
+                            <span>المجموع الكلي</span>
+                            <span id="summary-total" class="text-emerald-600">0.00 ر.س</span>
+                        </div>
+                        <button onclick="checkout()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center space-x-2 space-x-reverse mt-2">
+                            <i class="fas fa-check"></i>
+                            <span>إتمام عملية البيع</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. واجهة إدارة المنتجات (Products Management View) -->
+            <section id="view-products" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <!-- نموذج إضافة منتج جديد -->
+                <div class="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-zinc-800 text-lg border-b border-zinc-100 pb-2">إضافة منتج جديد للمخزن</h4>
+                    <form id="add-product-form" onsubmit="addNewProduct(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-500 mb-1.5">اسم المنتج</label>
+                            <input type="text" id="prod-name" required class="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" placeholder="مثال: إسبريسو مزدوج">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-500 mb-1.5">السعر (ر.س)</label>
+                                <input type="number" id="prod-price" step="0.01" required class="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-zinc-500 mb-1.5">الكمية بالمخزن</label>
+                                <input type="number" id="prod-stock" required class="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" placeholder="0">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-zinc-500 mb-1.5">رابط صورة المنتج (Unsplash)</label>
+                            <input type="url" id="prod-image" class="w-full border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" placeholder="https://images.unsplash.com/...">
+                        </div>
+                        <button type="submit" class="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-semibold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center space-x-2 space-x-reverse">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>حفظ المنتج في النظام</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- جدول عرض وتعديل المخزون الحالي -->
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-zinc-100">
+                        <h4 class="font-bold text-zinc-800 text-lg">جرد ومراقبة المخزون الحالي</h4>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-zinc-50 text-zinc-500 text-sm border-b border-zinc-100">
+                                    <th class="p-4 font-semibold">المنتج</th>
+                                    <th class="p-4 font-semibold">السعر</th>
+                                    <th class="p-4 font-semibold">الكمية المتوفرة</th>
+                                    <th class="p-4 font-semibold text-center">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-zinc-100 text-sm">
+                                <!-- تضاف الأسطر هنا تلقائياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- نظام تشغيل الـ JavaScript المدمج والذكي -->
+    <script>
+        // 1. البيانات الأولية والافتراضية للمشروع (Seed Data)
+        const defaultProducts = [
+            { id: 1, name: "قهوة فلات وايت", price: 15.00, stock: 45, image: "https://images.unsplash.com/photo-1577968897966-3d4325b36b61?w=400&auto=format&fit=crop&q=60" },
+            { id: 2, name: "دونات كلاسيك محشوة", price: 8.50, stock: 22, image: "https://images.unsplash.com/photo-1551024601-bec78aea704b?w=400&auto=format&fit=crop&q=60" },
+            { id: 3, name: "كرواسون بالجبنة الفرنسية", price: 12.00, stock: 15, image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400&auto=format&fit=crop&q=60" },
+            { id: 4, name: "ساندوتش كلوب دجاج وطماطم", price: 18.00, stock: 12, image: "https://images.unsplash.com/photo-1567234669013-216f2833075c?w=400&auto=format&fit=crop&q=60" },
+            { id: 5, name: "مياه معدنية نقية مكثفة", price: 2.00, stock: 90, image: "https://images.unsplash.com/photo-1608885898957-a599fb18de37?w=400&auto=format&fit=crop&q=60" }
+        ];
+
+        // 2. حالة النظام العامة (Global App State)
+        let products = JSON.parse(localStorage.getItem('pos_products')) || defaultProducts;
+        let sales = JSON.parse(localStorage.getItem('pos_sales')) || [];
+        let cart = [];
+        let currentView = 'dashboard';
+
+        // 3. الإعداد الأولي عند التحميل (Initialization)
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('pos_products')) {
+                saveToLocalStorage();
+            }
+            switchView('dashboard');
+            startClock();
+            updateAllUI();
+        });
+
+        // ساعة حية في الهيدر
+        function startClock() {
+            const clockEl = document.getElementById('live-clock');
+            setInterval(() => {
+                const now = new Date();
+                clockEl.innerText = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }, 1000);
+        }
+
+        // حفظ مستمر بالـ Local Storage
+        function saveToLocalStorage() {
+            localStorage.setItem('pos_products', JSON.stringify(products));
+            localStorage.setItem('pos_sales', JSON.stringify(sales));
+        }
+
+        // 4. نظام التنقل والـ Routing البسيط للملف الواحد
+        function switchView(viewName) {
+            currentView = viewName;
+            
+            // إخفاء جميع الأقسام أولاً
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-pos').classList.add('hidden');
+            document.getElementById('view-products').classList.add('hidden');
+            
+            // إزالة التحديد النشط من القائمة الجانبية
+            document.getElementById('nav-dashboard').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white";
+            document.getElementById('nav-pos').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white";
+            document.getElementById('nav-products').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white";
+
+            // إظهار القسم المطلوب وتحديث حالة الزر الجانبي
+            if (viewName === 'dashboard') {
+                document.getElementById('view-dashboard').classList.remove('hidden');
+                document.getElementById('nav-dashboard').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/10";
+                document.getElementById('view-title').innerText = "لوحة التحكم الرئيسية";
+            } else if (viewName === 'pos') {
+                document.getElementById('view-pos').classList.remove('hidden');
+                document.getElementById('nav-pos').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/10";
+                document.getElementById('view-title').innerText = "نقطة البيع السريعة";
+            } else if (viewName === 'products') {
+                document.getElementById('view-products').classList.remove('hidden');
+                document.getElementById('nav-products').className = "w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl transition-all font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/10";
+                document.getElementById('view-title').innerText = "إدارة المنتجات والمخازن";
+            }
+            updateAllUI();
+        }
+
+        // 5. محرك التحديث ومزامنة البيانات مع الواجهات (UI Renders)
+        function updateAllUI() {
+            renderDashboard();
+            renderPOSProducts();
+            renderCart();
+            renderInventoryTable();
+        }
+
+        // أ) تحديث لوحة التحكم
+        function renderDashboard() {
+            // حسابات المبيعات اليومية الإجمالية
+            const todayStr = new Date().toDateString();
+            const todaySales = sales.reduce((acc, sale) => acc + sale.total, 0); // للتبسيط تجمع العمليات الكلية
+            
+            document.getElementById('stat-sales').innerText = todaySales.toFixed(2) + " ر.س";
+            document.getElementById('stat-transactions').innerText = sales.length;
+            document.getElementById('stat-stock').innerText = products.reduce((acc, p) => acc + p.stock, 0);
+
+            // عرض المبيعات الأخيرة في جدول
+            const tableBody = document.getElementById('recent-sales-table');
+            tableBody.innerHTML = '';
+            
+            if (sales.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-zinc-400">لا توجد عمليات مبيعات مسجلة حتى الآن.</td></tr>`;
+                return;
+            }
+
+            [...sales].reverse().slice(0, 5).forEach(sale => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-zinc-50/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 font-mono font-bold text-zinc-700">#${sale.id}</td>
+                    <td class="p-4 text-zinc-500">${sale.time}</td>
+                    <td class="p-4 text-zinc-500">${sale.tax.toFixed(2)} ر.س</td>
+                    <td class="p-4 font-bold text-emerald-600">${sale.total.toFixed(2)} ر.س</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // ب) تحديث شبكة منتجات الـ POS
+        function renderPOSProducts() {
+            const grid = document.getElementById('pos-products-grid');
+            document.getElementById('pos-product-count').innerText = `${products.length} منتج مسجل`;
+            grid.innerHTML = '';
+
+            products.forEach(product => {
+                const isOut = product.stock <= 0;
+                const card = document.createElement('div');
+                card.className = `bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm flex flex-col justify-between transition-all ${isOut ? 'opacity-60' : 'hover:shadow-md hover:border-zinc-300'}`;
+                
+                card.innerHTML = `
+                    <div class="relative h-40 bg-zinc-100 overflow-hidden">
+                        <img src="${product.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'}" alt="${product.name}" class="w-full h-full object-cover">
+                        <span class="absolute top-2 left-2 text-xs font-bold px-2.5 py-1 rounded-lg ${isOut ? 'bg-rose-500 text-white' : 'bg-zinc-900/80 text-white backdrop-blur-sm'}">
+                            ${isOut ? 'منتهي' : `المخزون: ${product.stock}`}
+                        </span>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h5 class="font-bold text-zinc-800 text-base line-clamp-1">${product.name}</h5>
+                            <p class="text-emerald-600 font-extrabold text-lg mt-1">${product.price.toFixed(2)} <span class="text-xs font-normal">ر.س</span></p>
+                        </div>
+                        <button onclick="addToCart(${product.id})" ${isOut ? 'disabled' : ''} class="w-full ${isOut ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'} transition-colors font-bold text-sm py-2 px-4 rounded-xl flex items-center justify-center space-x-2 space-x-reverse">
+                            <i class="fas fa-cart-plus"></i>
+                            <span>${isOut ? 'غير متوفر' : 'إضافة للسلة'}</span>
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // جـ) تحديث سلة المشتريات والعمليات الحسابية المتصلة بها
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product || product.stock <= 0) return;
+
+            const cartItem = cart.find(item => item.productId === productId);
+            if (cartItem) {
+                if (cartItem.quantity < product.stock) {
+                    cartItem.quantity++;
+                } else {
+                    showToast("عذراً، تجاوزت الكمية المتاحة في المخزن!", "bg-amber-500");
+                    return;
+                }
+            } else {
+                cart.push({ productId, quantity: 1 });
+            }
+            updateCartUI();
+        }
+
+        function changeCartQuantity(productId, amount) {
+            const item = cart.find(i => i.productId === productId);
+            const product = products.find(p => p.id === productId);
+            if (!item) return;
+
+            item.quantity += amount;
+            if (item.quantity > product.stock) {
+                item.quantity = product.stock;
+                showToast("الكمية المطلوبة تغطي كل المخزون الحالي", "bg-amber-500");
+            }
+            if (item.quantity <= 0) {
+                cart = cart.filter(i => i.productId !== productId);
+            }
+            updateCartUI();
+        }
+
+        function clearCart() {
+            cart = [];
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items-container');
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div class="h-48 flex flex-col items-center justify-center text-zinc-400 text-sm space-y-2">
+                        <i class="fas fa-shopping-basket text-3xl text-zinc-200"></i>
+                        <span>السلة فارغة حالياً</span>
+                    </div>
+                `;
+                document.getElementById('summary-subtotal').innerText = '0.00 ر.س';
+                document.getElementById('summary-tax').innerText = '0.00 ر.س';
+                document.getElementById('summary-total').innerText = '0.00 ر.س';
+                return;
+            }
+
+            let subtotal = 0;
+
+            cart.forEach(item => {
+                const product = products.find(p => p.id === item.productId);
+                if (!product) return;
+
+                const itemTotal = product.price * item.quantity;
+                subtotal += itemTotal;
+
+                const div = document.createElement('div');
+                div.className = "pt-3 flex items-center justify-between group";
+                div.innerHTML = `
+                    <div class="flex-1 min-w-0 pl-2">
+                        <h6 class="font-bold text-zinc-800 text-sm truncate">${product.name}</h6>
+                        <span class="text-xs text-zinc-400 font-semibold">${product.price.toFixed(2)} × ${item.quantity}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 space-x-reverse">
+                        <div class="flex items-center bg-zinc-100 rounded-lg p-0.5 border border-zinc-200">
+                            <button onclick="changeCartQuantity(${product.id}, 1)" class="w-6 h-6 flex items-center justify-center text-zinc-600 hover:bg-white rounded-md transition-colors"><i class="fas fa-plus text-xs"></i></button>
+                            <span class="w-8 text-center font-bold text-sm text-zinc-700">${item.quantity}</span>
+                            <button onclick="changeCartQuantity(${product.id}, -1)" class="w-6 h-6 flex items-center justify-center text-zinc-600 hover:bg-white rounded-md transition-colors"><i class="fas fa-minus text-xs"></i></button>
+                        </div>
+                        <span class="font-bold text-zinc-700 text-sm min-w-[60px] text-left">${itemTotal.toFixed(2)} ر.س</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            const tax = subtotal * 0.15;
+            const total = subtotal + tax;
+
+            document.getElementById('summary-subtotal').innerText = subtotal.toFixed(2) + ' ر.س';
+            document.getElementById('summary-tax').innerText = tax.toFixed(2) + ' ر.س';
+            document.getElementById('summary-total').innerText = total.toFixed(2) + ' ر.س';
+        }
+
+        // د) نظام الدفع وإتمام البيع والخصم من المستودع (Checkout)
+        function checkout() {
+            if (cart.length === 0) {
+                showToast("السلة فارغة! يرجى إضافة منتجات لإتمام البيع.", "bg-rose-500");
+                return;
+            }
+
+            let subtotal = 0;
+            
+            // خصم الكميات من المخزون
+            cart.forEach(item => {
+                const product = products.find(p => p.id === item.productId);
+                if (product) {
+                    product.stock -= item.quantity;
+                    subtotal += product.price * item.quantity;
+                }
+            });
+
+            const tax = subtotal * 0.15;
+            const total = subtotal + tax;
+
+            // توليد الفاتورة وحفظها في قائمة المبيعات
+            const newInvoice = {
+                id: Math.floor(100000 + Math.random() * 900000), // رقم فاتورة عشوائي
+                time: new Date().toLocaleString('ar-SA'),
+                tax: tax,
+                total: total
+            };
+
+            sales.push(newInvoice);
+            cart = []; // تفريغ السلة
+
+            saveToLocalStorage();
+            updateAllUI();
+            showToast("تم إتمام عملية البيع وخصم المخزون بنجاح!", "bg-emerald-500");
+        }
+
+        // هـ) إدارة وجرد المنتجات وتحديث جدول البيانات والكميات
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+
+            products.forEach(product => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-zinc-50/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 flex items-center space-x-3 space-x-reverse">
+                        <img src="${product.image}" class="w-10 h-10 object-cover rounded-lg border border-zinc-200">
+                        <span class="font-bold text-zinc-700">${product.name}</span>
+                    </td>
+                    <td class="p-4 font-semibold text-zinc-600">${product.price.toFixed(2)} ر.س</td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${product.stock <= 5 ? 'bg-rose-50 text-rose-600' : 'bg-zinc-100 text-zinc-700'}">
+                            ${product.stock} وحدة
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <button onclick="deleteProduct(${product.id})" class="text-rose-500 hover:text-rose-700 p-2 transition-colors">
+                            <i class="fas fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // إضافة منتج جديد من خلال النموذج
+        function addNewProduct(e) {
+            e.preventDefault();
+            const name = document.getElementById('prod-name').value;
+            const price = parseFloat(document.getElementById('prod-price').value);
+            const stock = parseInt(document.getElementById('prod-stock').value);
+            let image = document.getElementById('prod-image').value;
+
+            if (!image) {
+                image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"; // صورة افتراضية عامة في حال عدم الإدخال
+            }
+
+            const newProd = {
+                id: Date.now(),
+                name,
+                price,
+                stock,
+                image
+            };
+
+            products.push(newProd);
+            saveToLocalStorage();
+            updateAllUI();
+            
+            // إعادة ضبط الحقول
+            document.getElementById('add-product-form').reset();
+            showToast("تمت إضافة المنتج الجديد بنجاح للمخزن!", "bg-emerald-500");
+        }
+
+        // حذف منتج من النظام
+        function deleteProduct(id) {
+            if (confirm("هل أنت متأكد من رغبتك في حذف هذا المنتج نهائياً من النظام؟")) {
+                products = products.filter(p => p.id !== id);
+                cart = cart.filter(c => c.productId !== id); // مسحه من السلة في حال وجوده
+                saveToLocalStorage();
+                updateAllUI();
+                showToast("تم حذف المنتج وتحديث البيانات", "bg-amber-500");
+            }
+        }
+
+        // 6. نظام الإشعارات السريع المخصص (Custom Toast Utility)
+        function showToast(message, bgColorClass = "bg-emerald-500") {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            
+            toast.className = `fixed top-5 left-5 z-50 transform transition-transform duration-300 ${bgColorClass} text-white px-6 py-3 rounded-xl shadow-lg flex items-center space-x-3 space-x-reverse`;
+            msgEl.innerText = message;
+            
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.remove('-translate-x-full'), 10);
+
+            setTimeout(() => {
+                toast.classList.add('-translate-x-full');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
